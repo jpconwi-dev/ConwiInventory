@@ -5,6 +5,7 @@ import { useAuth } from "./auth";
 import { Meter } from "./ui";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Analysis from "./pages/Analysis";
 import POS from "./pages/POS";
 import Products from "./pages/Products";
 import Sales from "./pages/Sales";
@@ -15,6 +16,7 @@ const Icon = ({ children }) => (
 );
 const NAV = [
   ["/", "Dashboard", <><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></>],
+  ["/analysis", "Analysis", <><path d="M3 20h18" /><rect x="5" y="11" width="3" height="9" /><rect x="10.5" y="5" width="3" height="15" /><rect x="16" y="14" width="3" height="6" /></>],
   ["/sell", "Sell", <><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /><path d="M2 3h3l2.7 11.4a1 1 0 0 0 1 .6h9.7a1 1 0 0 0 1-.8L21 7H6" /></>],
   ["/products", "Products", <><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="M3 8l9 5 9-5M12 13v8" /></>],
   ["/sales", "Sales", <><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" /><path d="M9 8h6M9 12h6" /></>],
@@ -92,6 +94,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
+        <Route path="analysis" element={<Analysis />} />
         <Route path="sell" element={<POS />} />
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<Sales />} />

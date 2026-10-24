@@ -31,4 +31,5 @@ Tables are created automatically on first start.
 - **Status** is automatic: Available, Low (at or below your alert level) or Out of stock (0). Each sale subtracts from stock.
 - **Dashboard / Sales**: filter by Day, Week (7 days), Month (30 days), Half year (6 months), Year (12 months).
   The chart splits income into capital and commission.
+- **Analysis**: compares the period with the one before it, lists key insights, categories, payment methods, busiest days and hours, slow movers, and saves it all as a PDF.
 - **Storage**: shows Neon database size against `STORAGE_LIMIT_MB`, size per table, and lets you delete old sales history or the stock log.

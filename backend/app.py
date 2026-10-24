@@ -293,10 +293,8 @@ def create_app():
                        totals={"revenue": float(rev), "commission": float(com), "orders": count})
 
     # ---------- reports ----------
-    @app.get("/api/reports")
-    @jwt_required()
-    def reports():
-        start, step = period_range(request.args.get("period", "week"))
+    def report_data(period):
+        start, step = period_range(period)
         start_utc, now = to_utc_naive(start), datetime.now(TZ)
         buckets = {}
         for b in bucket_starts(start, step, now):
@@ -327,8 +325,8 @@ def create_app():
 
         prods = Product.query.all()
         alerts = sorted((p for p in prods if p.stock <= p.low_stock_at), key=lambda p: p.stock)[:8]
-        return jsonify(
-            period=request.args.get("period", "week"),
+        return dict(
+            period=period,
             totals={"revenue": round(revenue, 2), "commission": round(commission, 2),
                     "orders": len(sales), "items": int(items_sold)},
             buckets=series,
@@ -337,6 +335,74 @@ def create_app():
                        "stock_commission": float(sum(p.commission * p.stock for p in prods)),
                        "alerts": [{"name": p.name, "stock": p.stock} for p in alerts]},
         )
+
+    @app.get("/api/reports")
+    @jwt_required()
+    def reports():
+        return jsonify(report_data(request.args.get("period", "week")))
+
+    @app.get("/api/analysis")
+    @jwt_required()
+    def analysis():
+        period = request.args.get("period", "week")
+        data = report_data(period)
+        start, _ = period_range(period)
+        now = datetime.now(TZ)
+        start_utc, now_utc = to_utc_naive(start), to_utc_naive(now)
+        prev_start = start_utc - (now_utc - start_utc)  # same length, right before this period
+
+        pr, pc, pn = db.session.query(
+            func.coalesce(func.sum(Sale.total), 0), func.coalesce(func.sum(Sale.commission_total), 0),
+            func.count(Sale.id)).filter(Sale.created_at >= prev_start, Sale.created_at < start_utc).one()
+
+        cat = func.coalesce(Product.category, "")
+        cat_rows = (db.session.query(cat, func.sum(SaleItem.qty), func.sum(SaleItem.qty * SaleItem.unit_price),
+                                     func.sum(SaleItem.qty * SaleItem.unit_commission))
+                    .select_from(SaleItem).join(Sale, SaleItem.sale_id == Sale.id)
+                    .outerjoin(Product, SaleItem.product_id == Product.id)
+                    .filter(Sale.created_at >= start_utc).group_by(cat).all())
+        categories = sorted(({"name": c or "Uncategorized", "qty": int(q), "revenue": float(r), "commission": float(m)}
+                             for c, q, r, m in cat_rows), key=lambda x: x["commission"], reverse=True)
+
+        commission_expr = func.sum(SaleItem.qty * SaleItem.unit_commission)
+        top_commission = [{"name": n, "qty": int(q), "revenue": float(r), "commission": float(m)} for n, q, r, m in
+                          db.session.query(SaleItem.name, func.sum(SaleItem.qty), func.sum(SaleItem.qty * SaleItem.unit_price), commission_expr)
+                          .select_from(SaleItem).join(Sale, SaleItem.sale_id == Sale.id)
+                          .filter(Sale.created_at >= start_utc).group_by(SaleItem.name)
+                          .order_by(commission_expr.desc()).limit(5).all()]
+
+        weekdays = [{"day": d, "orders": 0, "revenue": 0.0} for d in range(7)]
+        hours = [{"hour": h, "orders": 0, "revenue": 0.0} for h in range(24)]
+        pays = {}
+        for s in Sale.query.filter(Sale.created_at >= start_utc).all():
+            local = s.created_at.replace(tzinfo=timezone.utc).astimezone(TZ)
+            for slot in (weekdays[local.weekday()], hours[local.hour]):
+                slot["orders"] += 1
+                slot["revenue"] += float(s.total)
+            p = pays.setdefault(s.payment_method or "other", {"method": s.payment_method or "other", "orders": 0, "revenue": 0.0})
+            p["orders"] += 1
+            p["revenue"] += float(s.total)
+        for slot in weekdays + hours + list(pays.values()):
+            slot["revenue"] = round(slot["revenue"], 2)
+
+        sold_ids = {r[0] for r in db.session.query(SaleItem.product_id).join(Sale, SaleItem.sale_id == Sale.id)
+                    .filter(Sale.created_at >= start_utc, SaleItem.product_id.isnot(None)).distinct()}
+        prods = Product.query.all()
+        slow = sorted((p for p in prods if p.stock > 0 and p.id not in sold_ids),
+                      key=lambda p: p.real_price * p.stock, reverse=True)
+        return jsonify({
+            **data,
+            "range": {"from": start.date().isoformat(), "to": now.date().isoformat()},
+            "previous": {"revenue": float(pr), "commission": float(pc), "orders": pn},
+            "categories": categories,
+            "payments": sorted(pays.values(), key=lambda x: x["revenue"], reverse=True),
+            "top_commission": top_commission,
+            "weekdays": weekdays,
+            "hours": hours,
+            "slow": {"count": len(slow), "tied_up": float(sum(p.real_price * p.stock for p in slow)),
+                     "items": [{"name": p.name, "stock": p.stock, "tied_up": float(p.real_price * p.stock)} for p in slow[:10]]},
+            "stock": {"out": sum(1 for p in prods if p.stock <= 0), "low": sum(1 for p in prods if p.status == "low")},
+        })
 
     # ---------- storage monitor ----------
     @app.get("/api/storage")

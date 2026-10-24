@@ -107,6 +107,12 @@ button,input,select{font:inherit;color:inherit}
 .login-card h1 b{color:var(--teal)}.login-card img{margin-bottom:10px;border-radius:12px}
 .login-card .btn{margin-top:10px;padding:11px}
 
+.delta{display:block;font-style:normal;font-size:.8rem;font-weight:600;color:var(--muted)}.delta.up{color:var(--green)}.delta.down{color:var(--red)}
+.head-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.insights{margin:8px 0 0;padding-left:20px}.insights li{margin:6px 0}.insights li::marker{color:var(--gold)}
+.chart.short{height:220px}.gap-top{margin-top:18px}
+.xscroll{overflow-x:auto}
+.share{height:5px;background:var(--gold);border-radius:3px;margin-top:5px;min-width:2px}
 .topbar,.scrim,.close-btn,.cart-bar{display:none}
 .side-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .ico{width:19px;height:19px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
