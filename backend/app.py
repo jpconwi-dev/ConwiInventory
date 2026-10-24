@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -90,8 +91,8 @@ def bucket_label(dt, step):
 def create_app():
     app = Flask(__name__)
     uri = os.environ.get("DATABASE_URL", "sqlite:///conwi.db")
-    if uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
+    # Neon/Render give postgres:// or postgresql://; always use the psycopg 3 driver
+    uri = re.sub(r"^postgres(ql)?(\+\w+)?://", "postgresql+psycopg://", uri)
     app.config.update(
         SQLALCHEMY_DATABASE_URI=uri,
         SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True, "pool_recycle": 300},
