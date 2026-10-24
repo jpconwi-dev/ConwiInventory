@@ -17,9 +17,14 @@ TZ = ZoneInfo(os.environ.get("APP_TIMEZONE", "Asia/Manila"))
 
 
 class ApiError(Exception):
-    def __init__(self, message, status=400):
+    def __init__(self, message, status=400, extra=None):
         super().__init__(message)
-        self.message, self.status = message, status
+        self.message, self.status, self.extra = message, status, extra or {}
+
+
+def norm_name(name):
+    """'Tire 2.00-17' and 'tire  2.00 17' count as the same product."""
+    return re.sub(r"[^a-z0-9.]+", " ", name.lower()).strip()
 
 
 def money(value, label):
@@ -109,7 +114,7 @@ def create_app():
     @app.errorhandler(ApiError)
     def handle_api_error(e):
         db.session.rollback()
-        return jsonify(error=e.message), e.status
+        return jsonify(error=e.message, **e.extra), e.status
 
     @app.errorhandler(404)
     def handle_404(_):
@@ -166,6 +171,12 @@ def create_app():
         name = (data.get("name") or "").strip()
         if not name:
             raise ApiError("Product name is required")
+        key = norm_name(name)
+        for other in Product.query.all():
+            if other.id != p.id and norm_name(other.name) == key:
+                raise ApiError(f'"{other.name}" already exists ({other.stock} in stock). '
+                               "Add stock to it instead of creating a new product.",
+                               409, {"duplicate": other.to_dict()})
         sku = (data.get("sku") or "").strip() or None
         if sku:
             clash = Product.query.filter(Product.sku == sku, Product.id != (p.id or 0)).first()

@@ -63,6 +63,9 @@ button,input,select{font:inherit;color:inherit}
 .toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
 .search,.field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .toolbar .search{max-width:320px}
+.sort{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.dup{background:var(--gold-soft);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin:0 0 10px;color:var(--gold-ink)}
+.dup .actions{justify-content:flex-start;margin-top:8px}
 .field{display:flex;flex-direction:column;gap:4px;font-weight:500;font-size:.9rem;margin:10px 0}
 .field input,.field select{font-weight:400}
 

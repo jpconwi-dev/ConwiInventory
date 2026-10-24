@@ -2,13 +2,27 @@ import { useEffect, useState } from "react";
 import { api, peso } from "../api";
 import { Modal, StatusBadge } from "../ui";
 
+const normName = (s) => s.toLowerCase().replace(/[^a-z0-9.]+/g, " ").trim();
+const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+const SORTS = {
+  "name-asc": ["Name A to Z", byName],
+  "name-desc": ["Name Z to A", (a, b) => byName(b, a)],
+  newest: ["Newest first", (a, b) => b.id - a.id],
+  "stock-asc": ["Stock: low to high", (a, b) => a.stock - b.stock],
+  "stock-desc": ["Stock: high to low", (a, b) => b.stock - a.stock],
+  "price-asc": ["Price: low to high", (a, b) => a.price - b.price],
+  "price-desc": ["Price: high to low", (a, b) => b.price - a.price],
+  "comm-desc": ["Commission: high to low", (a, b) => b.commission - a.commission],
+};
+
 const blank = { name: "", category: "", sku: "", real_price: "", commission: "", stock: "", low_stock_at: 5 };
 
-function ProductForm({ initial, onClose, onSaved }) {
+function ProductForm({ initial, rows, onClose, onSaved, onAddStock, onEditExisting }) {
   const [f, setF] = useState(initial);
   const [err, setErr] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const price = (Number(f.real_price) || 0) + (Number(f.commission) || 0);
+  const dup = f.name.trim() ? rows.find((r) => r.id !== f.id && normName(r.name) === normName(f.name)) : null;
 
   async function save(e) {
     e.preventDefault();
@@ -26,6 +40,15 @@ function ProductForm({ initial, onClose, onSaved }) {
     <Modal title={f.id ? "Edit product" : "Add product"} onClose={onClose}>
       <form onSubmit={save} className="form">
         <label className="field wide-col">Product name<input value={f.name} onChange={set("name")} required autoFocus /></label>
+        {dup && (
+          <div className="dup wide-col" role="alert">
+            <b>"{dup.name}" already exists</b> with {dup.stock} in stock. You don't need to add it again.
+            <div className="actions">
+              <button type="button" className="btn small" onClick={() => onAddStock(dup)}>Add stock to it</button>
+              <button type="button" className="btn small" onClick={() => onEditExisting(dup)}>Edit it</button>
+            </div>
+          </div>
+        )}
         <label className="field">Category<input value={f.category} onChange={set("category")} /></label>
         <label className="field">SKU or barcode (optional)<input value={f.sku || ""} onChange={set("sku")} /></label>
         <label className="field">Real price (what you pay)
@@ -42,7 +65,7 @@ function ProductForm({ initial, onClose, onSaved }) {
         {err && <p className="err wide-col">{err}</p>}
         <div className="actions wide-col">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary">{f.id ? "Save changes" : "Add product"}</button>
+          <button className="btn primary" disabled={!!dup}>{f.id ? "Save changes" : "Add product"}</button>
         </div>
       </form>
     </Modal>
@@ -83,6 +106,7 @@ export default function Products() {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("name-asc");
   const [form, setForm] = useState(null);
   const [adjust, setAdjust] = useState(null);
   const [err, setErr] = useState("");
@@ -93,7 +117,7 @@ export default function Products() {
   const matches = (p) =>
     (filter === "all" || (filter === "in" && p.status !== "out") || p.status === filter) &&
     `${p.name} ${p.category} ${p.sku || ""}`.toLowerCase().includes(q.toLowerCase());
-  const shown = rows.filter(matches);
+  const shown = rows.filter(matches).sort(SORTS[sort][1]);
   const done = () => { setForm(null); setAdjust(null); load(); };
 
   async function remove(p) {
@@ -114,6 +138,9 @@ export default function Products() {
             <button key={k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>{l}</button>
           ))}
         </div>
+        <select className="sort" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
+          {Object.entries(SORTS).map(([k, [label]]) => <option key={k} value={k}>{label}</option>)}
+        </select>
       </div>
       {err && <p className="err">{err}</p>}
       {rows.length === 0 ? <p className="empty">No products yet. Add your first product with its real price and your commission.</p> : (
@@ -137,7 +164,11 @@ export default function Products() {
           </table>
         </div>
       )}
-      {form && <ProductForm initial={form} onClose={() => setForm(null)} onSaved={done} />}
+      {form && (
+        <ProductForm key={form.id || "new"} initial={form} rows={rows} onClose={() => setForm(null)} onSaved={done}
+          onAddStock={(p) => { setForm(null); setAdjust(p); }}
+          onEditExisting={(p) => setForm({ ...p, real_price: String(p.real_price), commission: String(p.commission) })} />
+      )}
       {adjust && <AdjustStock p={adjust} onClose={() => setAdjust(null)} onSaved={done} />}
     </>
   );
