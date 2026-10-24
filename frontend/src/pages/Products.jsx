@@ -144,16 +144,16 @@ export default function Products() {
       </div>
       {err && <p className="err">{err}</p>}
       {rows.length === 0 ? <p className="empty">No products yet. Add your first product with its real price and your commission.</p> : (
-        <div className="scroll">
-          <table className="table">
+        <div className="scroll flat">
+          <table className="table stack">
             <thead><tr><th>Product</th><th className="num">Real price</th><th className="num">Commission</th><th className="num">Selling price</th><th>Status</th><th /></tr></thead>
             <tbody>{shown.map((p) => (
               <tr key={p.id}>
-                <td><strong>{p.name}</strong><div className="muted small">{[p.category, p.sku].filter(Boolean).join(" · ")}</div></td>
-                <td className="num">{peso(p.real_price)}</td>
-                <td className="num gold-text">{peso(p.commission)}</td>
-                <td className="num">{peso(p.price)}</td>
-                <td><StatusBadge p={p} /></td>
+                <td className="title"><strong>{p.name}</strong><div className="muted small">{[p.category, p.sku].filter(Boolean).join(" · ")}</div></td>
+                <td className="num" data-label="Real price">{peso(p.real_price)}</td>
+                <td className="num gold-text" data-label="Commission">{peso(p.commission)}</td>
+                <td className="num" data-label="Selling price">{peso(p.price)}</td>
+                <td data-label="Status"><StatusBadge p={p} /></td>
                 <td className="row-actions">
                   <button className="btn small" onClick={() => setAdjust(p)}>Stock</button>
                   <button className="btn small" onClick={() => setForm({ ...p, real_price: String(p.real_price), commission: String(p.commission) })}>Edit</button>

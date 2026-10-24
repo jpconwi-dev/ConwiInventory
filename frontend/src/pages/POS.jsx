@@ -71,7 +71,7 @@ export default function POS() {
           )}
         </section>
 
-        <aside className="cart">
+        <aside className="cart" id="cart">
           <h2>Current sale</h2>
           {lines.length === 0 ? <p className="muted">Tap a product to add it.</p> : (
             <ul>
@@ -104,6 +104,13 @@ export default function POS() {
           </button>
         </aside>
       </div>
+
+      {lines.length > 0 && (
+        <div className="cart-bar">
+          <div><span className="small muted">{lines.reduce((s, l) => s + l.qty, 0)} items</span><b>{peso(total)}</b></div>
+          <button className="btn primary" onClick={() => document.getElementById("cart")?.scrollIntoView({ behavior: "smooth" })}>Review sale</button>
+        </div>
+      )}
 
       {receipt && (
         <Modal title="Sale complete" onClose={() => setReceipt(null)}>

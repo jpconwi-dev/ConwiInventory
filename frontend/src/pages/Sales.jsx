@@ -28,17 +28,17 @@ export default function Sales() {
             <div className="cell"><span>Orders</span><b>{data.totals.orders}</b></div>
           </section>
           {data.sales.length === 0 ? <p className="empty">No sales in this period.</p> : (
-            <div className="scroll">
-              <table className="table">
+            <div className="scroll flat">
+              <table className="table stack">
                 <thead><tr><th>Receipt</th><th>When</th><th>Payment</th><th className="num">Commission</th><th className="num">Total</th></tr></thead>
                 <tbody>{data.sales.map((s) => (
                   <Fragment key={s.id}>
                     <tr className="click" onClick={() => setOpen(open === s.id ? null : s.id)}>
-                      <td><strong>{s.receipt_no}</strong></td>
-                      <td>{fmtDate(s.created_at)}</td>
-                      <td>{s.payment_method}</td>
-                      <td className="num gold-text">{peso(s.commission_total)}</td>
-                      <td className="num">{peso(s.total)}</td>
+                      <td className="title"><strong>{s.receipt_no}</strong></td>
+                      <td data-label="When">{fmtDate(s.created_at)}</td>
+                      <td data-label="Payment">{s.payment_method}</td>
+                      <td className="num gold-text" data-label="Commission">{peso(s.commission_total)}</td>
+                      <td className="num" data-label="Total">{peso(s.total)}</td>
                     </tr>
                     {open === s.id && (
                       <tr className="detail"><td colSpan="5">
