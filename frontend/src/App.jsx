@@ -25,7 +25,7 @@ function Shell() {
   return (
     <div className="shell">
       <aside className="side">
-        <div className="brand">conwi<b>Inventory</b></div>
+        <div className="brand"><img src="/logo-mark.svg" alt="" width="32" height="32" />conwi<b>Inventory</b></div>
         <nav className="nav">
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/sell">Sell</NavLink>

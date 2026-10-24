@@ -32,6 +32,7 @@ export default function Login() {
   return (
     <div className="login">
       <form onSubmit={submit} className="login-card">
+        <img src="/logo-mark.svg" alt="" width="52" height="52" />
         <h1>conwi<b>Inventory</b></h1>
         <p className="muted">{setup ? "Create your owner account to get started." : "Log in to manage your stock and sales."}</p>
         <label className="field">Username
