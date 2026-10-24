@@ -1,0 +1,119 @@
+:root{--bg:#edf1ef;--surface:#fff;--ink:#12262a;--muted:#5d7377;--line:#d6e0dd;--teal:#0e5c63;--teal-dark:#0a3f44;--teal-soft:#cfe4e3;--gold:#e3a21a;--gold-soft:#f8e9bf;--gold-ink:#7a5200;--red:#b5372b;--red-soft:#f6dcd8;--green:#2b7a4b;--green-soft:#d9eddf;--r:10px}
+*{box-sizing:border-box}
+html,body,#root{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:"Familjen Grotesk","Instrument Sans",system-ui,sans-serif;margin:0;letter-spacing:-.01em}
+h1{font-size:1.75rem}h2{font-size:1.1rem;margin-bottom:6px}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.muted{color:var(--muted)}.small{font-size:.85rem}.red{color:var(--red)}.top-gap{margin-top:14px}
+.gold-text{color:var(--gold-ink)}.ok-text{color:var(--green)}
+.err{color:var(--red);font-weight:500}
+.boot{padding:40px;text-align:center}
+
+.shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.side{background:var(--teal-dark);color:#dcebea;padding:22px 14px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.brand{font:500 1.35rem "Familjen Grotesk",sans-serif;padding:0 8px}.brand b{font-weight:700;color:var(--gold)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{color:inherit;text-decoration:none;padding:9px 12px;border-radius:8px;font-weight:500}
+.nav a:hover{background:rgba(255,255,255,.08)}
+.nav a.active{background:var(--surface);color:var(--teal-dark)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:12px;padding:0 8px}
+.mini-storage{color:inherit;text-decoration:none;display:flex;flex-direction:column;gap:6px;font-size:.8rem}
+.linklike{background:none;border:0;padding:0;text-align:left;color:#b9d3d2;cursor:pointer;font-size:.85rem}
+.linklike:hover{color:#fff}
+.main{padding:28px 34px 48px;max-width:1180px;width:100%}
+.page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+
+.tabs{display:inline-flex;background:#dfe8e5;border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:6px 13px;border-radius:7px;cursor:pointer;font-weight:500;color:var(--muted)}
+.tabs button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+.strip{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:18px;overflow:hidden}
+.strip.three{grid-template-columns:repeat(3,1fr)}
+.cell{padding:16px 20px;border-left:1px solid var(--line);display:flex;flex-direction:column}
+.cell:first-child{border-left:0}
+.cell span{color:var(--muted);font-size:.85rem}
+.cell b{font:600 1.6rem "Familjen Grotesk",sans-serif}
+.cell.gold{background:var(--gold-soft)}.cell.gold b{color:var(--gold-ink)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid2 .panel{margin-bottom:0}
+.chart{height:300px;margin-top:10px}
+
+.table{width:100%;border-collapse:collapse}
+.table th{text-align:left;font-weight:500;color:var(--muted);font-size:.85rem;padding:8px 10px;border-bottom:1px solid var(--line)}
+.table td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.table tr:last-child td{border-bottom:0}
+.num{text-align:right!important;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.scroll .table th,.scroll .table td{padding-left:14px;padding-right:14px}
+.click{cursor:pointer}.click:hover{background:#f4f8f7}.detail td{background:#f7faf9;font-size:.9rem}
+.row-actions{white-space:nowrap;text-align:right}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.8rem;font-weight:600}
+.badge.ok{background:var(--green-soft);color:var(--green)}.badge.low{background:var(--gold-soft);color:var(--gold-ink)}.badge.out{background:var(--red-soft);color:var(--red)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:30px;text-align:center;color:var(--muted)}
+
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 15px;border-radius:8px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--teal)}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}.btn.primary:hover{background:var(--teal-dark)}
+.btn.danger{color:var(--red);border-color:#e3b9b3}.btn.danger:hover{background:var(--red-soft);border-color:var(--red)}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn.small{padding:4px 10px;font-size:.85rem}.btn.wide{width:100%;padding:12px;margin-top:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.search,.field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.toolbar .search{max-width:320px}
+.field{display:flex;flex-direction:column;gap:4px;font-weight:500;font-size:.9rem;margin:10px 0}
+.field input,.field select{font-weight:400}
+
+.pos{display:grid;grid-template-columns:1fr 350px;gap:20px;align-items:start}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+.tile{display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;cursor:pointer;min-height:96px}
+.tile:hover:not(:disabled){border-color:var(--teal);background:#f4faf9}
+.tile:disabled{opacity:.55;cursor:not-allowed}
+.tile .price{font:600 1.1rem "Familjen Grotesk",sans-serif;color:var(--teal)}
+.cart{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;position:sticky;top:20px}
+.cart ul{list-style:none;margin:8px 0;padding:0;max-height:300px;overflow:auto}
+.cart li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.cart li div:first-child{display:flex;flex-direction:column}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:28px;height:28px;border:1px solid var(--line);background:var(--surface);border-radius:6px;cursor:pointer}
+.qty input{width:44px;text-align:center;padding:4px;border:1px solid var(--line);border-radius:6px}
+.sum{display:flex;justify-content:space-between;padding:4px 0}.sum b{font:600 1.2rem "Familjen Grotesk",sans-serif}
+
+.overlay{position:fixed;inset:0;background:rgba(10,30,32,.5);display:grid;place-items:center;padding:16px;z-index:50}
+.modal{background:var(--surface);border-radius:12px;padding:20px 22px;width:100%;max-width:560px;max-height:92vh;overflow:auto}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}.form.one{grid-template-columns:1fr}
+.wide-col{grid-column:1/-1}
+.price-box{flex-direction:row;justify-content:space-between;align-items:center;background:var(--gold-soft);border-radius:8px;padding:10px 14px}
+.price-box b{font:600 1.3rem "Familjen Grotesk",sans-serif;color:var(--gold-ink)}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+.receipt h3{font-size:1.2rem}
+
+.meter{height:10px;background:#dfe8e5;border-radius:99px;overflow:hidden;margin:8px 0}
+.meter i{display:block;height:100%;background:var(--teal-soft);background:#7fb0b0;border-radius:99px}
+.meter i.warm{background:var(--gold)}.meter i.hot{background:var(--red)}
+.side .meter{background:rgba(255,255,255,.15);margin:0}.side .meter i{background:#9ccfce}.side .meter i.warm{background:var(--gold)}.side .meter i.hot{background:#ee7b6e}
+
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:30px;width:100%;max-width:380px;display:flex;flex-direction:column}
+.login-card h1 b{color:var(--teal)}
+.login-card .btn{margin-top:10px;padding:11px}
+
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;flex-direction:row;padding:6px;z-index:30}
+  .brand,.side-foot{display:none}
+  .nav{flex-direction:row;width:100%;justify-content:space-around}.nav a{padding:8px 10px;font-size:.85rem}
+  .main{padding:18px 14px 90px}
+  .strip,.strip.three{grid-template-columns:1fr 1fr}.cell:nth-child(3){border-left:0}
+  .grid2,.pos{grid-template-columns:1fr}.cart{position:static}
+  .form{grid-template-columns:1fr}
+}
+@media print{
+  body *{visibility:hidden}
+  .receipt,.receipt *{visibility:visible}
+  .receipt{position:fixed;inset:0;padding:20px;background:#fff}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
