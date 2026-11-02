@@ -8,10 +8,10 @@ from zoneinfo import ZoneInfo
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
-from sqlalchemy import func, text
+from sqlalchemy import func, inspect, text
 from sqlalchemy.exc import IntegrityError
 
-from models import Product, Sale, SaleItem, StockMovement, User, db, iso
+from models import EstoreEntry, Product, Sale, SaleItem, StockMovement, User, db, iso
 
 TZ = ZoneInfo(os.environ.get("APP_TIMEZONE", "Asia/Manila"))
 
@@ -110,6 +110,13 @@ def create_app():
     JWTManager(app)
     with app.app_context():
         db.create_all()
+        # db.create_all() doesn't add columns to tables that already exist, so add the Estores ones if missing
+        have = {c["name"] for c in inspect(db.engine).get_columns("estore_entries")}
+        for col, ddl in (("entry_date", "DATE"), ("source", "VARCHAR(10) DEFAULT 'admin'"),
+                         ("public_token", "VARCHAR(32)")):
+            if col not in have:
+                db.session.execute(text(f"ALTER TABLE estore_entries ADD COLUMN {col} {ddl}"))
+        db.session.commit()
 
     @app.errorhandler(ApiError)
     def handle_api_error(e):
@@ -404,6 +411,133 @@ def create_app():
             "stock": {"out": sum(1 for p in prods if p.stock <= 0), "low": sum(1 for p in prods if p.status == "low")},
         })
 
+    # ---------- estores (gcash / load / utang) ----------
+    ESTORE_SERVICES = ("gcash", "load", "utang")
+
+    def parse_entry_date(value):
+        today = datetime.now(TZ).date()
+        if not value:
+            return today
+        try:
+            d = datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+        except ValueError:
+            raise ApiError("Enter a valid date")
+        if d > today:
+            raise ApiError("The date can't be in the future")
+        return d
+
+    # ---- public store form (no login): can only ADD pending entries and look up its own ----
+    hits = {}  # ip -> recent submit times (per worker; just a speed bump against spam)
+
+    def client_ip():
+        return (request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0]).strip()
+
+    @app.get("/api/public/estores/config")
+    def public_estore_config():
+        return jsonify(pin_required=bool(os.environ.get("ESTORE_PIN")))
+
+    @app.post("/api/public/estores")
+    def public_create_estore():
+        now = datetime.utcnow()
+        recent = [t for t in hits.get(client_ip(), []) if now - t < timedelta(minutes=10)]
+        if len(recent) >= 20:
+            raise ApiError("Too many entries. Please wait a few minutes and try again.", 429)
+        data = request.get_json(silent=True) or {}
+        pin = os.environ.get("ESTORE_PIN")
+        if pin and not secrets.compare_digest(str(data.get("pin") or ""), pin):
+            raise ApiError("Wrong PIN", 403)
+        service = data.get("service")
+        if service not in ("gcash", "load"):
+            raise ApiError("Choose GCash or Load")
+        direction = "in" if service == "load" else data.get("direction")  # load = customer pays cash
+        if direction not in ("in", "out"):
+            raise ApiError("Choose cash in or cash out")
+        amount = money(data.get("amount"), "Amount")
+        if amount <= 0 or amount > 100000:
+            raise ApiError("Enter an amount between 1 and 100,000")
+        e = EstoreEntry(service=service, direction=direction, amount=amount, fee=Decimal("0"),
+                        customer=(data.get("customer") or "").strip()[:80],
+                        note=(data.get("note") or "").strip()[:200], status="pending", source="public",
+                        entry_date=parse_entry_date(data.get("entry_date")), public_token=secrets.token_hex(16))
+        db.session.add(e)
+        db.session.commit()
+        hits[client_ip()] = recent + [now]
+        return jsonify({**e.to_dict(), "token": e.public_token}), 201
+
+    @app.post("/api/public/estores/status")
+    def public_estore_status():
+        tokens = [str(t) for t in ((request.get_json(silent=True) or {}).get("tokens") or [])][:50]
+        rows = EstoreEntry.query.filter(EstoreEntry.public_token.in_(tokens)).all() if tokens else []
+        order = {t: i for i, t in enumerate(tokens)}
+        rows.sort(key=lambda e: order[e.public_token])
+        return jsonify([{"token": e.public_token, "service": e.service, "direction": e.direction,
+                         "amount": float(e.amount), "customer": e.customer or "", "note": e.note or "",
+                         "entry_date": e.entry_date.isoformat() if e.entry_date else None,
+                         "status": e.status} for e in rows])
+
+    @app.get("/api/estores")
+    @jwt_required()
+    def list_estores():
+        period = request.args.get("period", "week")
+        service = request.args.get("service", "all")
+        start, _ = period_range(period)
+        start_utc = to_utc_naive(start)
+        q = EstoreEntry.query
+        if service in ESTORE_SERVICES:
+            q = q.filter(EstoreEntry.service == service)
+        # pending entries always show (so an unpaid utang never disappears); done ones by the day they were done
+        entries = (q.filter((EstoreEntry.status == "pending") | (EstoreEntry.done_at >= start_utc))
+                   .order_by(EstoreEntry.entry_date.desc(), EstoreEntry.created_at.desc()).limit(500).all())
+        done = [e for e in entries if e.status == "done"]
+        pending = [e for e in entries if e.status == "pending"]
+        cash_in = sum((e.amount for e in done if e.direction == "in"), Decimal("0"))
+        cash_out = sum((e.amount for e in done if e.direction == "out"), Decimal("0"))
+        return jsonify(
+            entries=[e.to_dict() for e in entries],
+            totals={"cash_in": float(cash_in), "cash_out": float(cash_out), "net": float(cash_in - cash_out),
+                    "fees": float(sum((e.fee for e in done), Decimal("0"))), "done": len(done),
+                    "pending": len(pending),
+                    "pending_amount": float(sum((e.amount for e in pending), Decimal("0")))})
+
+    @app.post("/api/estores")
+    @jwt_required()
+    def create_estore():
+        data = request.get_json(silent=True) or {}
+        service, direction = data.get("service"), data.get("direction")
+        if service not in ESTORE_SERVICES:
+            raise ApiError("Choose GCash, Load or Utang")
+        if direction not in ("in", "out"):
+            raise ApiError("Choose cash in or cash out")
+        amount = money(data.get("amount"), "Amount")
+        if amount <= 0:
+            raise ApiError("Amount must be more than 0")
+        customer = (data.get("customer") or "").strip()[:80]
+        if service == "utang" and not customer:
+            raise ApiError("Enter the name of who owes you for utang")
+        e = EstoreEntry(service=service, direction=direction, amount=amount, fee=money(data.get("fee"), "Fee"),
+                        customer=customer, note=(data.get("note") or "").strip()[:200], status="pending",
+                        source="admin", entry_date=parse_entry_date(data.get("entry_date")))
+        db.session.add(e)
+        db.session.commit()
+        return jsonify(e.to_dict()), 201
+
+    @app.post("/api/estores/<int:eid>/done")
+    @jwt_required()
+    def estore_done(eid):
+        e = db.get_or_404(EstoreEntry, eid)
+        done = bool((request.get_json(silent=True) or {}).get("done", True))
+        e.status = "done" if done else "pending"
+        e.done_at = datetime.utcnow() if done else None
+        db.session.commit()
+        return jsonify(e.to_dict())
+
+    @app.delete("/api/estores/<int:eid>")
+    @jwt_required()
+    def delete_estore(eid):
+        db.session.delete(db.get_or_404(EstoreEntry, eid))
+        db.session.commit()
+        return jsonify(ok=True)
+
     # ---------- storage monitor ----------
     @app.get("/api/storage")
     @jwt_required()
@@ -414,7 +548,8 @@ def create_app():
             out["supported"] = True
             out["used_bytes"] = int(db.session.execute(text("select pg_database_size(current_database())")).scalar())
             models = {"products": Product, "sales": Sale, "sale_items": SaleItem,
-                      "stock_movements": StockMovement, "users": User}
+                      "stock_movements": StockMovement, "users": User,
+                      "estore_entries": EstoreEntry}
             rows = db.session.execute(text(
                 "select relname, pg_total_relation_size(relid) from pg_stat_user_tables order by 2 desc")).all()
             out["tables"] = [{"name": n, "bytes": int(b),

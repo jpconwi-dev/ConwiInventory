@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 
@@ -44,6 +44,7 @@ export default function Login() {
         </label>
         {err && <p className="err">{err}</p>}
         <button className="btn primary" disabled={busy || setup === null}>{setup ? "Create account" : "Log in"}</button>
+        <Link to="/store" className="btn store-btn">Estores (GCash / Load)</Link>
       </form>
     </div>
   );

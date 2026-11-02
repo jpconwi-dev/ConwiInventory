@@ -179,3 +179,15 @@ button,input,select{font:inherit;color:inherit}
   .receipt{position:fixed;inset:0;padding:20px;background:#fff}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.top-gap-s{margin-bottom:14px}
+.store{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px}
+.store-card{max-width:440px}
+.store-card .tabs{align-self:stretch}.store-card .tabs button{flex:1}
+.store-card .tabs.top-gap{margin-top:10px}
+.store-link{margin-top:14px;text-align:center;color:var(--muted);font-size:.9rem}
+.store-btn{margin-top:14px;text-align:center;text-decoration:none;color:var(--teal-dark);display:block;padding:11px}
+.store-list h2{margin-bottom:10px}
+.store-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.store-row>div{display:flex;flex-direction:column}.store-amt{align-items:flex-end}
+.store-list .btn{margin-top:12px}
+.badge.src{margin-left:6px;font-size:.7rem}

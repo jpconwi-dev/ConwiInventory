@@ -10,6 +10,8 @@ import POS from "./pages/POS";
 import Products from "./pages/Products";
 import Sales from "./pages/Sales";
 import Storage from "./pages/Storage";
+import Estores from "./pages/Estores";
+import StoreForm from "./pages/StoreForm";
 
 const Icon = ({ children }) => (
   <svg className="ico" viewBox="0 0 24 24" aria-hidden="true">{children}</svg>
@@ -20,6 +22,7 @@ const NAV = [
   ["/sell", "Sell", <><circle cx="9" cy="20" r="1" /><circle cx="18" cy="20" r="1" /><path d="M2 3h3l2.7 11.4a1 1 0 0 0 1 .6h9.7a1 1 0 0 0 1-.8L21 7H6" /></>],
   ["/products", "Products", <><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="M3 8l9 5 9-5M12 13v8" /></>],
   ["/sales", "Sales", <><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" /><path d="M9 8h6M9 12h6" /></>],
+  ["/estores", "Estores", <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18M7 15h4" /></>],
   ["/storage", "Storage", <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>],
 ];
 
@@ -92,12 +95,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/store" element={<StoreForm />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
         <Route path="analysis" element={<Analysis />} />
         <Route path="sell" element={<POS />} />
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<Sales />} />
+        <Route path="estores" element={<Estores />} />
         <Route path="storage" element={<Storage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

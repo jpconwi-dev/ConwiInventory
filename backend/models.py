@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -101,3 +101,30 @@ class StockMovement(db.Model):
     change = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.String(60))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+class EstoreEntry(db.Model):
+    """E-store ledger: GCash / load / utang. Counts toward totals only once marked done."""
+    __tablename__ = "estore_entries"
+    id = db.Column(db.Integer, primary_key=True)
+    service = db.Column(db.String(10), nullable=False, index=True)    # gcash | load | utang
+    direction = db.Column(db.String(3), nullable=False)               # in | out
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    fee = db.Column(db.Numeric(12, 2), nullable=False, default=0)     # what you earn on it
+    customer = db.Column(db.String(80), default="")
+    note = db.Column(db.String(200), default="")
+    status = db.Column(db.String(10), nullable=False, default="pending", index=True)  # pending | done
+    entry_date = db.Column(db.Date, default=date.today)               # date of the transaction
+    source = db.Column(db.String(10), nullable=False, default="admin")  # admin | public (store form)
+    public_token = db.Column(db.String(32), index=True)               # lets the store form look up its own entries
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    done_at = db.Column(db.DateTime, index=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "service": self.service, "direction": self.direction,
+            "amount": float(self.amount), "fee": float(self.fee), "customer": self.customer or "",
+            "note": self.note or "", "status": self.status,
+            "entry_date": self.entry_date.isoformat() if self.entry_date else None, "source": self.source,
+            "created_at": iso(self.created_at), "done_at": iso(self.done_at),
+        }
