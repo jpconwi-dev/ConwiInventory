@@ -191,3 +191,4 @@ button,input,select{font:inherit;color:inherit}
 .store-row>div{display:flex;flex-direction:column}.store-amt{align-items:flex-end}
 .store-list .btn{margin-top:12px}
 .badge.src{margin-left:6px;font-size:.7rem}
+.strip.two{grid-template-columns:repeat(2,1fr)}

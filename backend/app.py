@@ -426,6 +426,28 @@ def create_app():
             raise ApiError("The date can't be in the future")
         return d
 
+    def estore_fields(data, allowed_services):
+        """Validate the fields shared by create (admin + public) and edit."""
+        service = data.get("service")
+        if service not in allowed_services:
+            raise ApiError("Choose a valid service")
+        direction = data.get("direction")
+        if service == "utang":
+            direction = "out"   # utang = something given on credit; paid back when you confirm it
+        elif service == "load" and direction not in ("in", "out"):
+            direction = "in"
+        if direction not in ("in", "out"):
+            raise ApiError("Choose cash in or cash out")
+        amount = money(data.get("amount"), "Amount")
+        if amount <= 0 or amount > 1000000:
+            raise ApiError("Enter a valid amount")
+        customer = (data.get("customer") or "").strip()[:80]
+        if service == "utang" and not customer:
+            raise ApiError("Enter the name of who owes you for utang")
+        return dict(service=service, direction=direction, amount=amount, customer=customer,
+                    note=(data.get("note") or "").strip()[:200],
+                    entry_date=parse_entry_date(data.get("entry_date")))
+
     # ---- public store form (no login): can only ADD pending entries and look up its own ----
     hits = {}  # ip -> recent submit times (per worker; just a speed bump against spam)
 
@@ -446,19 +468,11 @@ def create_app():
         pin = os.environ.get("ESTORE_PIN")
         if pin and not secrets.compare_digest(str(data.get("pin") or ""), pin):
             raise ApiError("Wrong PIN", 403)
-        service = data.get("service")
-        if service not in ("gcash", "load"):
-            raise ApiError("Choose GCash or Load")
-        direction = "in" if service == "load" else data.get("direction")  # load = customer pays cash
-        if direction not in ("in", "out"):
-            raise ApiError("Choose cash in or cash out")
-        amount = money(data.get("amount"), "Amount")
-        if amount <= 0 or amount > 100000:
+        f = estore_fields(data, ("gcash", "load", "utang"))
+        if f["amount"] > 100000:
             raise ApiError("Enter an amount between 1 and 100,000")
-        e = EstoreEntry(service=service, direction=direction, amount=amount, fee=Decimal("0"),
-                        customer=(data.get("customer") or "").strip()[:80],
-                        note=(data.get("note") or "").strip()[:200], status="pending", source="public",
-                        entry_date=parse_entry_date(data.get("entry_date")), public_token=secrets.token_hex(16))
+        e = EstoreEntry(**f, fee=Decimal("0"), status="pending", source="public",
+                        public_token=secrets.token_hex(16))
         db.session.add(e)
         db.session.commit()
         hits[client_ip()] = recent + [now]
@@ -488,8 +502,12 @@ def create_app():
         # pending entries always show (so an unpaid utang never disappears); done ones by the day they were done
         entries = (q.filter((EstoreEntry.status == "pending") | (EstoreEntry.done_at >= start_utc))
                    .order_by(EstoreEntry.entry_date.desc(), EstoreEntry.created_at.desc()).limit(500).all())
-        done = [e for e in entries if e.status == "done"]
-        pending = [e for e in entries if e.status == "pending"]
+        money_rows = [e for e in entries if e.service != "utang"]   # utang is tracked separately below
+        done = [e for e in money_rows if e.status == "done"]
+        pending = [e for e in money_rows if e.status == "pending"]
+        utang = [e for e in entries if e.service == "utang"]
+        unpaid = [e for e in utang if e.status == "pending"]
+        paid = [e for e in utang if e.status == "done"]
         cash_in = sum((e.amount for e in done if e.direction == "in"), Decimal("0"))
         cash_out = sum((e.amount for e in done if e.direction == "out"), Decimal("0"))
         return jsonify(
@@ -497,29 +515,32 @@ def create_app():
             totals={"cash_in": float(cash_in), "cash_out": float(cash_out), "net": float(cash_in - cash_out),
                     "fees": float(sum((e.fee for e in done), Decimal("0"))), "done": len(done),
                     "pending": len(pending),
-                    "pending_amount": float(sum((e.amount for e in pending), Decimal("0")))})
+                    "pending_amount": float(sum((e.amount for e in pending), Decimal("0"))),
+                    "utang_unpaid": len(unpaid),
+                    "utang_unpaid_amount": float(sum((e.amount for e in unpaid), Decimal("0"))),
+                    "utang_paid_amount": float(sum((e.amount for e in paid), Decimal("0")))})
 
     @app.post("/api/estores")
     @jwt_required()
     def create_estore():
         data = request.get_json(silent=True) or {}
-        service, direction = data.get("service"), data.get("direction")
-        if service not in ESTORE_SERVICES:
-            raise ApiError("Choose GCash, Load or Utang")
-        if direction not in ("in", "out"):
-            raise ApiError("Choose cash in or cash out")
-        amount = money(data.get("amount"), "Amount")
-        if amount <= 0:
-            raise ApiError("Amount must be more than 0")
-        customer = (data.get("customer") or "").strip()[:80]
-        if service == "utang" and not customer:
-            raise ApiError("Enter the name of who owes you for utang")
-        e = EstoreEntry(service=service, direction=direction, amount=amount, fee=money(data.get("fee"), "Fee"),
-                        customer=customer, note=(data.get("note") or "").strip()[:200], status="pending",
-                        source="admin", entry_date=parse_entry_date(data.get("entry_date")))
+        e = EstoreEntry(**estore_fields(data, ESTORE_SERVICES), fee=money(data.get("fee"), "Fee"),
+                        status="pending", source="admin")
         db.session.add(e)
         db.session.commit()
         return jsonify(e.to_dict()), 201
+
+    @app.put("/api/estores/<int:eid>")
+    @jwt_required()
+    def update_estore(eid):
+        e = db.get_or_404(EstoreEntry, eid)
+        data = request.get_json(silent=True) or {}
+        f = estore_fields(data, ESTORE_SERVICES)
+        for k, v in f.items():
+            setattr(e, k, v)
+        e.fee = money(data.get("fee"), "Fee")
+        db.session.commit()
+        return jsonify(e.to_dict())
 
     @app.post("/api/estores/<int:eid>/done")
     @jwt_required()
