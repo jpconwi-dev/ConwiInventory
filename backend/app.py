@@ -667,16 +667,86 @@ def create_app():
         out["oldest_sale"] = iso(oldest)
         return jsonify(out)
 
+    def cleanup_query(target, days):
+        """Records older than N days that are safe to delete (pending Estores entries are never touched)."""
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        if target == "sales":
+            return db.session.query(Sale).filter(Sale.created_at < cutoff)
+        if target == "stock_movements":
+            return db.session.query(StockMovement).filter(StockMovement.created_at < cutoff)
+        if target == "estore_entries":
+            return db.session.query(EstoreEntry).filter(EstoreEntry.status == "done", EstoreEntry.done_at < cutoff)
+        return db.session.query(Expense).filter(Expense.expense_date < (datetime.now(TZ) - timedelta(days=days)).date())
+
+    def local_time(dt):
+        return dt.replace(tzinfo=timezone.utc).astimezone(TZ).strftime("%Y-%m-%d %H:%M") if dt else ""
+
+    # ---------- export (backup before deleting) ----------
+    EXPORT_TARGETS = ("all", "sales", "stock_movements", "estore_entries", "expenses", "products")
+
+    @app.get("/api/export")
+    @jwt_required()
+    def export_data():
+        """Returns plain tables (columns + rows). The web app turns them into Excel, CSV, PDF or Word."""
+        target = request.args.get("target", "all")
+        if target not in EXPORT_TARGETS:
+            raise ApiError("Choose what to export")
+        days = request.args.get("older_than_days")
+        days = whole(days, "Days", 1) if days not in (None, "") else None
+        want = lambda t: target in ("all", t)
+        sets = []
+
+        def add(name, columns, rows, money=()):
+            sets.append({"name": name, "columns": columns, "rows": rows, "money": list(money)})
+
+        if want("sales"):
+            q = cleanup_query("sales", days) if days else Sale.query
+            sales = q.order_by(Sale.created_at).all()
+            add("Sales", ["Receipt", "Date", "Payment", "Total", "Commission", "Amount paid", "Change"],
+                [[s.receipt_no, local_time(s.created_at), s.payment_method, float(s.total), float(s.commission_total),
+                  float(s.amount_paid), float(s.change_due)] for s in sales],
+                ["Total", "Commission", "Amount paid", "Change"])
+            add("Sale items", ["Receipt", "Date", "Product", "Qty", "Unit price", "Real price", "Commission each", "Subtotal"],
+                [[s.receipt_no, local_time(s.created_at), i.name, i.qty, float(i.unit_price), float(i.unit_real_price),
+                  float(i.unit_commission), float(i.unit_price * i.qty)] for s in sales for i in s.items],
+                ["Unit price", "Real price", "Commission each", "Subtotal"])
+        if want("stock_movements"):
+            q = cleanup_query("stock_movements", days) if days else StockMovement.query
+            add("Stock log", ["Date", "Product", "Change", "Reason"],
+                [[local_time(m.created_at), m.product_name or "", m.change, m.reason or ""]
+                 for m in q.order_by(StockMovement.created_at).all()])
+        if want("estore_entries"):
+            q = cleanup_query("estore_entries", days) if days else EstoreEntry.query
+            add("Estores", ["Date", "Service", "Type", "Customer", "Note", "Amount", "Fee", "Status", "Done at", "Source"],
+                [[e.entry_date.isoformat() if e.entry_date else "", e.service,
+                  "utang" if e.service == "utang" else ("cash in" if e.direction == "in" else "cash out"),
+                  e.customer or "", e.note or "", float(e.amount), float(e.fee),
+                  ("paid" if e.service == "utang" else "received") if e.status == "done" else
+                  ("unpaid" if e.service == "utang" else "pending"),
+                  local_time(e.done_at), e.source or ""]
+                 for e in q.order_by(EstoreEntry.entry_date, EstoreEntry.created_at).all()],
+                ["Amount", "Fee"])
+        if want("expenses"):
+            q = cleanup_query("expenses", days) if days else Expense.query
+            add("Expenses", ["Date", "Category", "Note", "Amount"],
+                [[x.expense_date.isoformat() if x.expense_date else "", x.category or "", x.note or "", float(x.amount)]
+                 for x in q.order_by(Expense.expense_date, Expense.created_at).all()], ["Amount"])
+        if target == "products" or (target == "all" and not days):
+            add("Products", ["SKU", "Name", "Category", "Real price", "Commission", "Selling price", "Stock", "Low-stock alert"],
+                [[p.sku or "", p.name, p.category or "", float(p.real_price), float(p.commission), float(p.price),
+                  p.stock, p.low_stock_at] for p in Product.query.order_by(Product.name).all()],
+                ["Real price", "Commission", "Selling price"])
+        return jsonify(generated_at=local_time(datetime.utcnow()), target=target, older_than_days=days, datasets=sets)
+
     @app.post("/api/storage/cleanup")
     @jwt_required()
     def cleanup():
         data = request.get_json(silent=True) or {}
         target = data.get("target")
-        if target not in ("sales", "stock_movements"):
-            raise ApiError("Choose sales history or stock movement log")
+        if target not in ("sales", "stock_movements", "estore_entries", "expenses"):
+            raise ApiError("Choose what to clear")
         days = whole(data.get("older_than_days"), "Days", 1)
-        model = Sale if target == "sales" else StockMovement
-        query = db.session.query(model).filter(model.created_at < datetime.utcnow() - timedelta(days=days))
+        query = cleanup_query(target, days)
         count = query.count()
         if data.get("dry_run") or count == 0:
             return jsonify(count=count, deleted=False)
@@ -684,8 +754,10 @@ def create_app():
         db.session.commit()
         if db.engine.dialect.name == "postgresql":  # hand the disk space back so the meter drops
             try:
+                tables = {"sales": ["sales", "sale_items"], "stock_movements": ["stock_movements"],
+                          "estore_entries": ["estore_entries"], "expenses": ["expenses"]}[target]
                 with db.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                    for table in (["sales", "sale_items"] if target == "sales" else ["stock_movements"]):
+                    for table in tables:
                         conn.execute(text(f"VACUUM FULL {table}"))
             except Exception:
                 pass

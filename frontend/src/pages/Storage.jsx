@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, fmtBytes, fmtDate } from "../api";
 import { Meter } from "../ui";
+import ExportButtons from "../ExportButtons";
+import { EXPORT_LABELS } from "../export";
 
 const TARGETS = {
   stock_movements: { label: "Stock movement log", days: 90, note: "Safe to clear. It only records past restocks and sales for reference." },
   sales: { label: "Old sales history", days: 365, note: "This also removes those sales from your income charts and totals." },
+  estore_entries: { label: "Old Estores", days: 365, note: "Only confirmed (received or paid) entries are removed; pending and unpaid utang are always kept. This also removes them from the Estores and Income totals." },
+  expenses: { label: "Old expenses", days: 365, note: "This also removes those expenses from your Expenses and Income totals." },
 };
 
 export default function Storage() {
@@ -15,6 +19,8 @@ export default function Storage() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [exTarget, setExTarget] = useState("all");
+  const [exDays, setExDays] = useState("");
 
   const load = () => api("/storage").then(setS).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
@@ -83,11 +89,31 @@ export default function Storage() {
               ) : (
                 <button className="btn danger" disabled={busy} onClick={confirmDelete}>Delete {preview} records</button>
               )}
+              <div className="top-gap">
+                <p className="small"><strong>Download a backup of these records first</strong></p>
+                <ExportButtons target={target} days={Number(days) || undefined} />
+              </div>
               <p className="muted small top-gap">To remove products, use the Delete button on the Products page.</p>
             </section>
           </div>
         </>
       )}
+
+      <section className="panel top-gap">
+        <h2>Download your records</h2>
+        <p className="muted small">Save your records as Excel, a dataset (CSV), PDF or Word, then you can safely delete the old ones above to free up storage.</p>
+        <div className="tabs top-gap-s">
+          {Object.entries(EXPORT_LABELS).map(([k, label]) => (
+            <button key={k} className={exTarget === k ? "on" : ""} onClick={() => setExTarget(k)}>{label}</button>
+          ))}
+        </div>
+        {exTarget !== "products" && (
+          <label className="field">Only records older than (days). Leave empty to download everything.
+            <input type="number" min="1" value={exDays} placeholder="e.g. 365" onChange={(e) => setExDays(e.target.value)} />
+          </label>
+        )}
+        <ExportButtons target={exTarget} days={exTarget === "products" ? undefined : Number(exDays) || undefined} />
+      </section>
     </>
   );
 }
