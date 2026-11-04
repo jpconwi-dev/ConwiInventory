@@ -11,7 +11,7 @@ from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
 from sqlalchemy import func, inspect, text
 from sqlalchemy.exc import IntegrityError
 
-from models import EstoreEntry, Product, Sale, SaleItem, StockMovement, User, db, iso
+from models import EstoreEntry, Expense, Product, Sale, SaleItem, StockMovement, User, db, iso
 
 TZ = ZoneInfo(os.environ.get("APP_TIMEZONE", "Asia/Manila"))
 
@@ -559,6 +559,93 @@ def create_app():
         db.session.commit()
         return jsonify(ok=True)
 
+
+    # ---------- expenses ----------
+    def expense_fields(data):
+        amount = money(data.get("amount"), "Amount")
+        if amount <= 0 or amount > 10000000:
+            raise ApiError("Enter a valid amount")
+        return dict(amount=amount, category=(data.get("category") or "").strip()[:60],
+                    note=(data.get("note") or "").strip()[:200],
+                    expense_date=parse_entry_date(data.get("expense_date")))
+
+    @app.get("/api/expenses")
+    @jwt_required()
+    def list_expenses():
+        start, _ = period_range(request.args.get("period", "month"))
+        since = start.date()
+        rows = (Expense.query.filter(Expense.expense_date >= since)
+                .order_by(Expense.expense_date.desc(), Expense.created_at.desc()).limit(500).all())
+        total = db.session.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
+            Expense.expense_date >= since).scalar()
+        count = db.session.query(func.count(Expense.id)).filter(Expense.expense_date >= since).scalar()
+        cats = {}
+        for name, amt in db.session.query(Expense.category, func.sum(Expense.amount)).filter(
+                Expense.expense_date >= since).group_by(Expense.category).all():
+            key = (name or "").strip() or "Other"
+            cats[key] = cats.get(key, Decimal("0")) + amt
+        return jsonify(
+            expenses=[e.to_dict() for e in rows], total=float(total), count=count,
+            categories=[{"name": k, "total": float(v)} for k, v in sorted(cats.items(), key=lambda kv: kv[1], reverse=True)])
+
+    @app.post("/api/expenses")
+    @jwt_required()
+    def create_expense():
+        e = Expense(**expense_fields(request.get_json(silent=True) or {}))
+        db.session.add(e)
+        db.session.commit()
+        return jsonify(e.to_dict()), 201
+
+    @app.put("/api/expenses/<int:xid>")
+    @jwt_required()
+    def update_expense(xid):
+        e = db.get_or_404(Expense, xid)
+        for k, v in expense_fields(request.get_json(silent=True) or {}).items():
+            setattr(e, k, v)
+        db.session.commit()
+        return jsonify(e.to_dict())
+
+    @app.delete("/api/expenses/<int:xid>")
+    @jwt_required()
+    def delete_expense(xid):
+        db.session.delete(db.get_or_404(Expense, xid))
+        db.session.commit()
+        return jsonify(ok=True)
+
+    # ---------- income totals (products + gcash + load + utang, minus expenses) ----------
+    @app.get("/api/totals")
+    @jwt_required()
+    def income_totals():
+        start, _ = period_range(request.args.get("period", "month"))
+        start_utc = to_utc_naive(start)
+        orders, sales, commission = db.session.query(
+            func.count(Sale.id), func.coalesce(func.sum(Sale.total), 0),
+            func.coalesce(func.sum(Sale.commission_total), 0)).filter(Sale.created_at >= start_utc).one()
+        done = EstoreEntry.query.filter(EstoreEntry.status == "done", EstoreEntry.done_at >= start_utc).all()
+        zero = Decimal("0")
+        gcash = [e for e in done if e.service == "gcash"]
+        load = [e for e in done if e.service == "load"]
+        utang_paid = [e for e in done if e.service == "utang"]
+        unpaid_n, unpaid_amt = db.session.query(
+            func.count(EstoreEntry.id), func.coalesce(func.sum(EstoreEntry.amount), 0)).filter(
+            EstoreEntry.service == "utang", EstoreEntry.status == "pending").one()
+        spent = db.session.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
+            Expense.expense_date >= start.date()).scalar()
+        gcash_fees = sum((e.fee for e in gcash), zero)
+        load_fees = sum((e.fee for e in load), zero)
+        earnings = Decimal(commission) + gcash_fees + load_fees
+        return jsonify(
+            products={"orders": orders, "sales": float(sales), "earnings": float(commission)},
+            gcash={"count": len(gcash),
+                   "cash_in": float(sum((e.amount for e in gcash if e.direction == "in"), zero)),
+                   "cash_out": float(sum((e.amount for e in gcash if e.direction == "out"), zero)),
+                   "earnings": float(gcash_fees)},
+            load={"count": len(load), "amount": float(sum((e.amount for e in load), zero)),
+                  "earnings": float(load_fees)},
+            utang={"paid_count": len(utang_paid), "paid": float(sum((e.amount for e in utang_paid), zero)),
+                   "unpaid_count": unpaid_n, "unpaid": float(unpaid_amt)},
+            total_earnings=float(earnings), expenses=float(spent), net=float(earnings - Decimal(spent)))
+
     # ---------- storage monitor ----------
     @app.get("/api/storage")
     @jwt_required()
@@ -570,7 +657,7 @@ def create_app():
             out["used_bytes"] = int(db.session.execute(text("select pg_database_size(current_database())")).scalar())
             models = {"products": Product, "sales": Sale, "sale_items": SaleItem,
                       "stock_movements": StockMovement, "users": User,
-                      "estore_entries": EstoreEntry}
+                      "estore_entries": EstoreEntry, "expenses": Expense}
             rows = db.session.execute(text(
                 "select relname, pg_total_relation_size(relid) from pg_stat_user_tables order by 2 desc")).all()
             out["tables"] = [{"name": n, "bytes": int(b),

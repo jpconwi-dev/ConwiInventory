@@ -11,6 +11,8 @@ import Products from "./pages/Products";
 import Sales from "./pages/Sales";
 import Storage from "./pages/Storage";
 import Estores from "./pages/Estores";
+import Expenses from "./pages/Expenses";
+import Totals from "./pages/Totals";
 import StoreForm from "./pages/StoreForm";
 
 const Icon = ({ children }) => (
@@ -23,6 +25,8 @@ const NAV = [
   ["/products", "Products", <><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="M3 8l9 5 9-5M12 13v8" /></>],
   ["/sales", "Sales", <><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" /><path d="M9 8h6M9 12h6" /></>],
   ["/estores", "Estores", <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18M7 15h4" /></>],
+  ["/expenses", "Expenses", <><rect x="3" y="6" width="18" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9v.01M18 15v.01" /></>],
+  ["/totals", "Income totals", <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>],
   ["/storage", "Storage", <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>],
 ];
 
@@ -103,6 +107,8 @@ export default function App() {
         <Route path="products" element={<Products />} />
         <Route path="sales" element={<Sales />} />
         <Route path="estores" element={<Estores />} />
+        <Route path="expenses" element={<Expenses />} />
+        <Route path="totals" element={<Totals />} />
         <Route path="storage" element={<Storage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

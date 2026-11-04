@@ -128,3 +128,22 @@ class EstoreEntry(db.Model):
             "entry_date": self.entry_date.isoformat() if self.entry_date else None, "source": self.source,
             "created_at": iso(self.created_at), "done_at": iso(self.done_at),
         }
+
+
+class Expense(db.Model):
+    """Money the owner spends (rent, electricity, transport, supplies...)."""
+    __tablename__ = "expenses"
+    id = db.Column(db.Integer, primary_key=True)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    category = db.Column(db.String(60), default="")
+    note = db.Column(db.String(200), default="")
+    expense_date = db.Column(db.Date, default=date.today, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "amount": float(self.amount), "category": self.category or "",
+            "note": self.note or "",
+            "expense_date": self.expense_date.isoformat() if self.expense_date else None,
+            "created_at": iso(self.created_at),
+        }
